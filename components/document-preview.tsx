@@ -67,7 +67,7 @@ export function DocumentPreview({ content, documentType, recipientName }: Docume
         </div>
       </CardHeader>
       <CardContent>
-        <div className={`p-6 rounded-lg min-h-[400px] ${getDocumentStyle()}`}>
+        <div id="document-preview" className={`p-6 rounded-lg min-h-[400px] ${getDocumentStyle()}`}>
           {isEditing ? (
             <textarea
               value={editedContent}

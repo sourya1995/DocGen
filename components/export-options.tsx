@@ -15,6 +15,10 @@ import {
   Share2
 } from 'lucide-react';
 import { useState } from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
+import * as XLSX from 'xlsx';
 
 interface ExportOptionsProps {
   content: string;
@@ -76,9 +80,55 @@ export function ExportOptions({ content, documentType, recipientName }: ExportOp
       a.download = `${fileName}.txt`;
       a.click();
       URL.revokeObjectURL(url);
-    } else {
-      // For other formats, we would integrate with specialized libraries
-      alert(`${format.toUpperCase()} export will be implemented with appropriate libraries (PDF: jsPDF, DOCX: docx.js)`);
+    } else if (format === 'pdf') {
+      const input = document.getElementById('document-preview'); // Assuming there is a preview element with this id
+      if (input) {
+        html2canvas(input).then((canvas) => {
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF();
+          const imgProps = pdf.getImageProperties(imgData);
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+          pdf.save(`${fileName}.pdf`);
+        });
+      }
+    } else if (format === 'docx') {
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `${documentType.charAt(0).toUpperCase() + documentType.slice(1)} for ${recipientName}`,
+                    bold: true,
+                    size: 28,
+                  }),
+                ],
+              }),
+              new Paragraph({
+                children: [new TextRun(content)],
+              }),
+            ],
+          },
+        ],
+      });
+
+      Packer.toBlob(doc).then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${fileName}.docx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    } else if (format === 'csv') {
+        const ws = XLSX.utils.aoa_to_sheet([[content]]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Document');
+        XLSX.writeFile(wb, `${fileName}.xlsx`);
     }
   };
 
@@ -88,8 +138,9 @@ export function ExportOptions({ content, documentType, recipientName }: ExportOp
       return;
     }
     
-    // In a real implementation, this would integrate with email APIs like SendGrid, AWS SES, etc.
-    alert(`Email functionality will be implemented with email service APIs. Would send to: ${emailAddress}`);
+    const subject = `${documentType} for ${recipientName}`;
+    const body = encodeURIComponent(content);
+    window.location.href = `mailto:${emailAddress}?subject=${subject}&body=${body}`;
   };
 
   return (
