@@ -29,6 +29,8 @@ interface ExportOptionsProps {
 export function ExportOptions({ content, documentType, recipientName }: ExportOptionsProps) {
   const [exportFormat, setExportFormat] = useState('html');
   const [emailAddress, setEmailAddress] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const exportFormats = [
     { value: 'html', label: 'HTML Document', icon: Globe, color: 'bg-orange-500' },
@@ -125,22 +127,47 @@ export function ExportOptions({ content, documentType, recipientName }: ExportOp
         URL.revokeObjectURL(url);
       });
     } else if (format === 'csv') {
-        const ws = XLSX.utils.aoa_to_sheet([[content]]);
+        const lines = content.split('\n').map(line => [line]);
+        const ws = XLSX.utils.aoa_to_sheet(lines);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Document');
         XLSX.writeFile(wb, `${fileName}.xlsx`);
     }
   };
 
-  const handleEmailSend = () => {
+  const handleEmailSend = async () => {
     if (!emailAddress) {
       alert('Please enter an email address');
       return;
     }
-    
-    const subject = `${documentType} for ${recipientName}`;
-    const body = encodeURIComponent(content);
-    window.location.href = `mailto:${emailAddress}?subject=${subject}&body=${body}`;
+
+    setIsSendingEmail(true);
+    setEmailError(null);
+
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: emailAddress,
+          subject: `${documentType} for ${recipientName}`,
+          content,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send email');
+      }
+
+      alert('Email sent successfully (mock)!');
+    } catch (error) {
+      setEmailError('Failed to send email. Please try again.');
+      console.error('Email sending failed:', error);
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   return (
@@ -207,11 +234,21 @@ export function ExportOptions({ content, documentType, recipientName }: ExportOp
               onChange={(e) => setEmailAddress(e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md bg-background"
             />
-            <Button onClick={handleEmailSend}>
-              <Send className="w-4 h-4 mr-2" />
-              Send
+            <Button onClick={handleEmailSend} disabled={isSendingEmail}>
+              {isSendingEmail ? (
+                <>
+                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Send
+                </>
+              )}
             </Button>
           </div>
+          {emailError && <p className="text-red-500 text-sm mt-2">{emailError}</p>}
         </div>
 
         {/* Share Section */}

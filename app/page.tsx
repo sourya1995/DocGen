@@ -16,7 +16,6 @@ import { DocumentPreview } from '@/components/document-preview';
 import { TemplateManager } from '@/components/template-manager';
 import { ExportOptions } from '@/components/export-options';
 import { FileText, Sparkles, Download, Settings, Upload, Mail, Calendar, Trophy, AlertCircle, FileType } from 'lucide-react';
-import { generateDocumentContent, detectDocumentType, extractPlaceholders } from '@/lib/content-generator';
 import { templates } from '@/lib/templates';
 
 type TemplateKey = keyof typeof templates;
@@ -33,27 +32,33 @@ export default function Home() {
 
   const handleGenerate = async () => {
     if (!prompt.trim() || !recipientName.trim()) return;
-    
+
     setIsGenerating(true);
-    
+    setGeneratedContent('');
+
     try {
-      // Detect document type from prompt
-      const detectedType = detectDocumentType(prompt) as TemplateKey;
-      setDocumentType(detectedType);
-      
-      // Extract additional details from prompt
-      const placeholders = extractPlaceholders(prompt, recipientName, message);
-      
-      // Find appropriate template
-      const template = templates[detectedType] || templates.generic;
-      setSelectedTemplate(detectedType);
-      
-      // Generate content
-      const content = generateDocumentContent(template, placeholders);
-      setGeneratedContent(content);
-      
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          recipientName,
+          message,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate document');
+      }
+
+      const data = await response.json();
+      setDocumentType(data.documentType);
+      setGeneratedContent(data.generatedContent);
     } catch (error) {
       console.error('Generation failed:', error);
+      // Optionally, show an error message to the user
     } finally {
       setIsGenerating(false);
     }
